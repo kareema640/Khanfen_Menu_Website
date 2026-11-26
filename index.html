@@ -15,12 +15,23 @@
   <a class="logo" href="#home" aria-label="Kehnfan home">Kehn<span>fan</span></a>
   <button class="nav__toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks" aria-label="Toggle navigation"><i></i><i></i><i></i></button>
   <nav class="nav__links" id="navLinks" aria-label="Main">
-    <a href="#home">Home</a><a href="#menu">Menu</a><a href="#about">About</a><a href="#reviews">Reviews</a><a href="#reservations">Reservations</a><a href="#contact">Contact</a>
+    <a href="#home">Home</a><a href="#menu">Menu</a><a href="order.html">Order Online</a><a href="#about">About</a><a href="#reviews">Reviews</a><a href="#reservations" data-open-reservation>Reservations</a><a href="#contact">Contact</a>
   </nav>
   <div class="nav__tools">
-    <span class="nav__search" aria-hidden="true"></span>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0"/></svg>
+    <div class="nav__search-wrap" id="navSearchWrap">
+      <form class="nav__search-form" id="navSearchForm" role="search">
+        <input class="nav__search" id="navSearchInput" type="search" placeholder="Search menu..." aria-label="Search menu items" autocomplete="off">
+        <button class="nav__search-clear" id="navSearchClear" type="button" aria-label="Clear search" hidden>×</button>
+        <button class="nav__search-btn" id="navSearchBtn" type="submit" aria-label="Search menu">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+      </form>
+      <div class="nav__search-results" id="navSearchResults" role="listbox" aria-label="Search results" hidden></div>
+    </div>
+    <button class="nav__cart-btn" id="cartToggle" type="button" aria-label="Open shopping cart" aria-controls="cartDrawer" aria-expanded="false">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0"/></svg>
+      <span class="nav__cart-badge" id="cartBadge" hidden>0</span>
+    </button>
   </div>
 </header>
 
@@ -30,7 +41,7 @@
     <p class="eyebrow">BREAKFAST · COFFEE · DESSERTS</p>
     <h1>Good Mornings<br><span class="amp">&amp;</span> <em>Better Bites</em></h1>
     <p class="hero__lead">Freshly made breakfast sandwiches, delicious drinks, and sweet treats to make every morning worth waking up for.</p>
-    <div class="hero__cta"><a class="btn btn--light" href="#menu">Order Now →</a><a class="btn btn--ghost" href="#reservations">Book a Table</a></div>
+    <div class="hero__cta"><a class="btn btn--light" href="#menu">Order Now →</a><a class="btn btn--ghost" href="#reservations" data-open-reservation>Book a Table</a></div>
   </div>
 </section>
 
@@ -77,24 +88,31 @@
 <section class="reviews" id="reviews">
   <p class="eyebrow">REVIEWS</p>
   <h2>Made with Love, <em>Loved by You</em></h2>
-  <div class="reviews__grid">
-    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>The breakfast sandwiches are absolutely amazing! Fresh, delicious, and honestly the perfect way to start my day.</blockquote><figcaption>Kareema Esmaiel</figcaption></figure>
-    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>Such a cozy place! The coffee is great, the desserts are irresistible, and everything tastes freshly made</blockquote><figcaption>Noha Sherief</figcaption></figure>
-    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>My new favorite breakfast spot! Loved the food, the atmosphere, and every little detail. Can't wait to come back!</blockquote><figcaption>Mariam Samy</figcaption></figure>
+  <div class="reviews__grid" id="reviewsGrid" aria-live="polite">
+    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>The breakfast sandwiches are absolutely amazing! Fresh, delicious, and honestly the perfect way to start my day.</blockquote><figcaption><span>Kareema Esmaiel</span></figcaption></figure>
+    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>Such a cozy place! The coffee is great, the desserts are irresistible, and everything tastes freshly made</blockquote><figcaption><span>Noha Sherief</span></figcaption></figure>
+    <figure><div class="stars" aria-label="5 out of 5 stars">★★★★★</div><blockquote>My new favorite breakfast spot! Loved the food, the atmosphere, and every little detail. Can't wait to come back!</blockquote><figcaption><span>Mariam Samy</span></figcaption></figure>
   </div>
-  <button class="btn btn--light reviews__add" type="button">Add Review +</button>
+  <p class="reviews__status" id="reviewsStatus" hidden></p>
+  <div class="reviews__foot">
+    <div class="arrows reviews__arrows" id="reviewsNav" hidden>
+      <button id="revPrev" type="button" aria-label="Previous reviews">←</button>
+      <button id="revNext" type="button" aria-label="Next reviews">→</button>
+    </div>
+    <button class="btn btn--light reviews__add" id="openAddReview" type="button">Add Review +</button>
+  </div>
 </section>
 
 <section class="book" id="reservations" style="background-image:url(assets/images/backgrounds/book-table.jpg)">
   <p class="eyebrow">RESERVATIONS</p>
   <h2>Save your seat this weekend.</h2>
-  <button class="btn btn--light" type="button">Book a Table</button>
+  <a class="btn btn--light" href="#reservations" data-open-reservation>Book a Table</a>
 </section>
 </main>
 
 <footer class="foot" id="contact">
   <div class="foot__brand"><a class="logo" href="#home">Kehn<span>fan</span></a><p>Breakfast sandwiches, coffee and desserts, made fresh every morning.</p></div>
-  <div><h3 class="eyebrow">EXPLORE</h3><ul><li><a href="#menu">Menu</a></li><li><a href="#menu">Order Online</a></li><li><a href="#reservations">Reservations</a></li><li><a href="#reviews">Reviews</a></li><li><a href="#about">About</a></li></ul></div>
+  <div><h3 class="eyebrow">EXPLORE</h3><ul><li><a href="#menu">Menu</a></li><li><a href="order.html">Order Online</a></li><li><a href="#reservations" data-open-reservation>Reservations</a></li><li><a href="#reviews">Reviews</a></li><li><a href="#about">About</a></li></ul></div>
   <div><h3 class="eyebrow">VISIT</h3><ul><li>15 hours per day</li><li>Nasr City, Egypt</li><li><a href="tel:+201067182487">01067182487</a></li></ul></div>
   <div><h3 class="eyebrow">NEWSLETTER</h3><p>Fresh news, once a month</p>
     <div class="news"><input type="text" placeholder="Go to check your order" aria-label="Newsletter"><button type="button" aria-label="Subscribe">→</button></div></div>
@@ -106,7 +124,138 @@
     <div class="tabs" id="fullTabs" role="group" aria-label="Full menu categories"></div>
     <div class="grid" id="fullGrid"></div></div>
 </div>
+<div class="cart-backdrop" id="cartBackdrop" hidden></div>
+<aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-labelledby="cartTitle" hidden>
+  <div class="cart-drawer__head">
+    <div>
+      <p class="eyebrow">YOUR ORDER</p>
+      <h2 id="cartTitle">Your Cart</h2>
+    </div>
+    <button class="cart-drawer__close" id="cartClose" type="button" aria-label="Close cart">×</button>
+  </div>
+  <div class="cart-drawer__body" id="cartItems"></div>
+  <div class="cart-drawer__foot" id="cartSummary" hidden>
+    <div class="cart-summary__row"><span>Items</span><strong id="cartItemCount">0</strong></div>
+    <div class="cart-summary__row cart-summary__total"><span>Subtotal</span><strong id="cartTotal">$0</strong></div>
+    <div class="cart-drawer__actions">
+      <button class="btn btn--olive cart-checkout" id="cartCheckout" type="button">Checkout →</button>
+      <button class="cart-clear" id="cartClear" type="button">Clear cart</button>
+    </div>
+    <p class="cart-status" id="cartStatus" role="status" aria-live="polite" hidden></p>
+  </div>
+</aside>
+<div class="cart-toast" id="cartToast" role="status" aria-live="polite" hidden></div>
+
+<div class="review-backdrop" id="reviewModalBackdrop" hidden></div>
+<div class="review-modal" id="reviewModal" role="dialog" aria-modal="true" aria-labelledby="reviewModalTitle" hidden>
+  <div class="review-modal__card" id="reviewFormView">
+    <div class="review-modal__head">
+      <div>
+        <p class="eyebrow">ADD A REVIEW</p>
+        <h2 id="reviewModalTitle">Share your <em>morning</em></h2>
+      </div>
+      <button class="review-modal__close" id="closeReviewModal" type="button" aria-label="Close review modal">×</button>
+    </div>
+
+    <form class="rev-form" id="reviewForm" novalidate>
+      <div class="rev-field" id="revNameField">
+        <label for="revName">Your name</label>
+        <input id="revName" name="name" type="text" placeholder="What should we call you?" maxlength="80" autocomplete="name" required>
+        <span class="rev-field-err" id="revNameErr" hidden></span>
+      </div>
+
+      <div class="rev-field" id="revEmailField">
+        <label for="revEmail">Your email <span class="rev-opt">(optional)</span></label>
+        <input id="revEmail" name="email" type="email" placeholder="you@email.com" autocomplete="email">
+        <span class="rev-field-err" id="revEmailErr" hidden></span>
+      </div>
+
+      <div class="rev-field" id="revRatingField">
+        <label>Your rating</label>
+        <div class="rev-stars-row">
+          <div class="rev-stars" id="revStars" role="radiogroup" aria-label="Star rating">
+            <button type="button" class="rev-star" data-star="1" role="radio" aria-checked="false" aria-label="1 star">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+            <button type="button" class="rev-star" data-star="2" role="radio" aria-checked="false" aria-label="2 stars">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+            <button type="button" class="rev-star" data-star="3" role="radio" aria-checked="false" aria-label="3 stars">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+            <button type="button" class="rev-star" data-star="4" role="radio" aria-checked="false" aria-label="4 stars">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+            <button type="button" class="rev-star" data-star="5" role="radio" aria-checked="false" aria-label="5 stars">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+          </div>
+          <span class="rev-rating-text" id="revRatingText">Tap a star to rate</span>
+        </div>
+        <span class="rev-field-err" id="revRatingErr" hidden></span>
+      </div>
+
+      <div class="rev-field" id="revTextField">
+        <label for="revText">Your review</label>
+        <textarea id="revText" name="review" rows="4" maxlength="500" placeholder="How was your experience?" required></textarea>
+        <div class="rev-text-foot">
+          <span class="rev-field-err" id="revTextErr" hidden></span>
+          <span class="rev-char-count" id="revCharCount">0 / 500</span>
+        </div>
+      </div>
+
+      <div class="rev-field" id="revPhotoField">
+        <label id="revPhotoLabel" for="revPhotoInput">Add a photo <span class="rev-opt">(optional)</span></label>
+        <input id="revPhotoInput" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden>
+        <div class="rev-dropzone" id="revDropzone" tabindex="0" role="button" aria-label="Upload a photo (JPG or PNG, up to 5 MB)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          <span>Drag a photo here or <strong>browse</strong> &middot; JPG, PNG up to 5 MB</span>
+        </div>
+        <div class="rev-photo-preview" id="revPhotoPreview" hidden>
+          <img id="revPhotoThumb" src="" alt="Selected review photo preview">
+          <div class="rev-photo-info">
+            <strong id="revPhotoName"></strong>
+            <span id="revPhotoMeta"></span>
+            <div class="rev-photo-bar"><i></i></div>
+          </div>
+          <button class="rev-photo-remove" id="revPhotoRemove" type="button" aria-label="Remove selected photo">×</button>
+        </div>
+        <span class="rev-field-err" id="revPhotoErr" hidden></span>
+      </div>
+
+      <p class="res-error" id="revSubmitErr" role="alert" hidden></p>
+
+      <button class="btn btn--olive rev-submit" id="revSubmitBtn" type="submit">Submit Review</button>
+    </form>
+  </div>
+
+  <div class="review-modal__card review-modal__success" id="reviewSuccessView" hidden>
+    <div class="rev-success-badge" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    </div>
+    <div class="rev-success-stars" id="revSuccessStars" aria-hidden="true">★★★★★</div>
+    <h2>Thanks for sharing <em>the love!</em></h2>
+    <p>Your feedback means a lot to us. We appreciate you taking the time to share your experience!</p>
+    <button class="btn btn--olive rev-back-btn" id="backToReviewsBtn" type="button">Back to Reviews</button>
+  </div>
+</div>
+
+<div class="res-backdrop" id="reservationModalBackdrop" hidden></div>
+<div class="res-modal" id="reservationModal" role="dialog" aria-modal="true" aria-label="Book Your Table" hidden>
+  <div class="res-modal__card">
+    <button class="res-modal__close" id="closeReservationModal" type="button" aria-label="Close reservation modal">×</button>
+    <div id="reservationFlowRoot"></div>
+  </div>
+</div>
+
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
+<script src="js/reviews.js"></script>
+<script src="js/reservations.js"></script>
 </body>
 </html>
