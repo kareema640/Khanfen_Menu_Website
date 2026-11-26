@@ -1,0 +1,218 @@
+(function () {
+  const root = document.getElementById('confirmationRoot');
+  if (!root || !window.MENU) return;
+
+  const CART = window.KEHNFAN_CART;
+  const { currency } = window.MENU;
+  const LAST_ORDER_KEY = 'kehnfan_last_order_v1';
+  const ORDERS_MAP_KEY = 'kehnfan_orders_v1';
+
+  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const fmtMoney = n => {
+    if (CART) return CART.fmtMoney(n);
+    const val = Number(n || 0);
+    return Number.isInteger(val) ? currency + val : currency + Number(val.toFixed(2));
+  };
+
+  function readSavedOrder(orderNumber) {
+    try {
+      const clean = String(orderNumber || '').trim().replace(/^#/, '').toUpperCase();
+      if (clean) {
+        const map = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
+        if (map && typeof map === 'object') {
+          const matchKey = Object.keys(map).find(k => k.toUpperCase() === clean);
+          if (matchKey && map[matchKey]) return map[matchKey];
+        }
+      }
+      const last = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || 'null');
+      if (last && (!clean || String(last.orderNumber || '').toUpperCase() === clean)) {
+        return last;
+      }
+    } catch {}
+    return null;
+  }
+
+  function saveOrderToStorage(order) {
+    if (!order || !order.orderNumber) return;
+    try {
+      localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(order));
+      const storedMap = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
+      const map = storedMap && typeof storedMap === 'object' && !Array.isArray(storedMap) ? storedMap : {};
+      map[order.orderNumber] = order;
+      localStorage.setItem(ORDERS_MAP_KEY, JSON.stringify(map));
+    } catch {}
+  }
+
+  function formatPaymentLabel(payment) {
+    if (!payment) return 'Cash on Delivery';
+    if (payment.method === 'cash-delivery') return 'Cash on Delivery';
+    if (payment.method === 'cash-pickup') return 'Cash on Pickup';
+    if (payment.method === 'card') return `${payment.brand || 'Card'} ·••• ${payment.last4 || ''}`.trim();
+    if (payment.method === 'online') return `Online · ${payment.wallet || 'Digital Wallet'}`;
+    return payment.method;
+  }
+
+  function formatEtaDisplay(order) {
+    const isDelivery = order.fulfillment !== 'pickup';
+    const createdMs = Date.parse(order.createdAt) || Date.now();
+    const etaMax = Number(order.etaMaxMinutes) || (isDelivery ? 35 : 20);
+    const etaMin = Number(order.etaMinMinutes) || (isDelivery ? 25 : 15);
+    const arrivalIso = order.estimatedArrivalAt || new Date(createdMs + etaMax * 60 * 1000).toISOString();
+    const arrivalTime = new Date(arrivalIso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    if (!isDelivery) {
+      if (order.pickupTime && order.pickupTime !== 'ASAP · 15 min') {
+        return `${order.pickupTime} · Nasr City`;
+      }
+      return `15–20 min · ${arrivalTime}`;
+    }
+    return `${etaMin}–${etaMax} min · ${arrivalTime}`;
+  }
+
+  function renderMissingOrder(lookupError) {
+    root.innerHTML = `<div class="res-card ord-conf-card ord-conf-empty">
+      <p class="eyebrow">ORDER CONFIRMATION</p>
+      <h1 class="res-title res-title--center">Find your <em>order</em></h1>
+      <p class="ord-conf-empty__desc">Enter your order ID to view your confirmation receipt and live status, or place a new order from our menu.</p>
+      <form class="ord-lookup-form" id="confLookupForm" novalidate>
+        <input id="confLookupInput" type="text" placeholder="e.g. KF-ORD-12345" aria-label="Order ID" required>
+        <button type="submit" class="btn btn--olive">Find Order</button>
+      </form>
+      ${lookupError ? `<p class="res-error" role="alert">${esc(lookupError)}</p>` : ''}
+      <div class="ord-conf-empty__actions">
+        <a class="btn res-btn-outline" href="order.html">Order Online &rarr;</a>
+        <a class="btn res-btn-outline" href="index.html#home">Back to Home</a>
+      </div>
+    </div>`;
+  }
+
+  function renderOrder(order) {
+    const firstName = (order.fullName || 'friend').trim().split(/\s+/)[0] || 'friend';
+    const isDelivery = order.fulfillment !== 'pickup';
+    const feeLabel = isDelivery ? 'Delivery' : 'Pickup';
+    const etaLabel = isDelivery ? 'ARRIVING IN' : 'READY IN';
+    const locationLabel = isDelivery ? 'DELIVERING TO' : 'PICKUP LOCATION';
+    const locationValue = isDelivery
+      ? order.address
+      : `${order.pickupLocation || 'Kehnfan · Nasr City, Cairo'}${order.pickupTime ? ` (${order.pickupTime})` : ''}`;
+
+    document.title = `Order #${order.orderNumber} Confirmed – Kehnfan`;
+
+    root.innerHTML = `<div class="res-card ord-conf-card">
+      <div class="ord-conf-hero">
+        <div class="ord-conf-badge" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+        <p class="eyebrow ord-conf-thanks">THANK YOU, ${esc(firstName.toUpperCase())}</p>
+        <h1 class="ord-conf-title">Your order is <em>${isDelivery ? 'on its way' : 'being prepared'}</em></h1>
+        <p class="ord-conf-id">Order #${esc(order.orderNumber)}</p>
+      </div>
+
+      <section class="ord-conf-ticket" aria-label="Order summary">
+        <div class="ord-conf-items">
+          ${(order.items || []).map(item => {
+            const extras = [];
+            if (item.size && item.size !== 'Regular') extras.push(item.size);
+            if (Array.isArray(item.addons) && item.addons.length) {
+              extras.push(...item.addons.map(a => `+ ${a.label}`));
+            }
+            const extraText = extras.length ? ` (${extras.join(', ')})` : '';
+            return `<div class="ord-conf-row">
+              <span class="ord-conf-row__item">
+                <span>${item.qty} &times; ${esc(item.name)}${esc(extraText)}</span>
+                <small class="ord-conf-row__unit">${fmtMoney(item.unitPrice)} each</small>
+              </span>
+              <strong class="ord-conf-row__price">${fmtMoney(item.lineTotal)}</strong>
+            </div>`;
+          }).join('')}
+          ${order.discount > 0 ? `<div class="ord-conf-row ord-conf-row--discount">
+            <span>Promo (${esc(order.promoCode)})</span>
+            <strong>&minus;${fmtMoney(order.discount)}</strong>
+          </div>` : ''}
+          <div class="ord-conf-row">
+            <span>${feeLabel}</span>
+            <strong>${fmtMoney(order.fee)}</strong>
+          </div>
+        </div>
+
+        <div class="ord-conf-ticket__divider"></div>
+
+        <div class="ord-conf-total">
+          <span>Total</span>
+          <strong>${fmtMoney(order.total)}</strong>
+        </div>
+      </section>
+
+      <div class="ord-conf-meta-grid">
+        <div class="ord-conf-meta-card">
+          <p class="ord-conf-meta-card__label">PAYMENT</p>
+          <strong class="ord-conf-meta-card__val">${esc(formatPaymentLabel(order.payment))}</strong>
+        </div>
+        <div class="ord-conf-meta-card">
+          <p class="ord-conf-meta-card__label">${etaLabel}</p>
+          <strong class="ord-conf-meta-card__val">${esc(formatEtaDisplay(order))}</strong>
+        </div>
+      </div>
+
+      <div class="ord-conf-meta-card ord-conf-meta-card--full">
+        <p class="ord-conf-meta-card__label">${locationLabel}</p>
+        <strong class="ord-conf-meta-card__val">${esc(locationValue)}</strong>
+        ${isDelivery && order.instructions ? `<span class="ord-conf-meta-card__note">Note: ${esc(order.instructions)}</span>` : ''}
+      </div>
+
+      <div class="ord-conf-actions">
+        <a class="btn btn--olive ord-conf-track-btn" href="tracking.html?order=${encodeURIComponent(order.orderNumber)}">Track Order &rarr;</a>
+        <a class="btn res-btn-outline ord-conf-secondary-btn" href="order.html">Order More</a>
+      </div>
+    </div>`;
+  }
+
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const paramOrder = (params.get('order') || '').trim().replace(/^#/, '');
+    let saved = readSavedOrder(paramOrder);
+
+    if (saved) {
+      renderOrder(saved);
+    }
+
+    const targetNumber = paramOrder || (saved && saved.orderNumber) || '';
+    if (!targetNumber) {
+      renderMissingOrder('');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(targetNumber)}`);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data && data.order) {
+          saveOrderToStorage(data.order);
+          renderOrder(data.order);
+          return;
+        }
+      }
+      if (!saved) {
+        renderMissingOrder(`We could not find order #${targetNumber}.`);
+      }
+    } catch {
+      if (!saved) {
+        renderMissingOrder('Unable to load order details right now.');
+      }
+    }
+  }
+
+  root.addEventListener('submit', async e => {
+    if (e.target && e.target.id === 'confLookupForm') {
+      e.preventDefault();
+      const input = document.getElementById('confLookupInput');
+      const code = input ? input.value.trim().replace(/^#/, '') : '';
+      if (!code) return;
+      window.location.href = `confirmation.html?order=${encodeURIComponent(code.toUpperCase())}`;
+    }
+  });
+
+  init();
+})();

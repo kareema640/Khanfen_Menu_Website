@@ -637,18 +637,28 @@
       }
 
       state.confirmedOrder = data.order;
+      try {
+        localStorage.setItem('kehnfan_last_order_v1', JSON.stringify(data.order));
+        const storedMap = JSON.parse(localStorage.getItem('kehnfan_orders_v1') || '{}');
+        const map = storedMap && typeof storedMap === 'object' && !Array.isArray(storedMap) ? storedMap : {};
+        map[data.order.orderNumber] = data.order;
+        localStorage.setItem('kehnfan_orders_v1', JSON.stringify(map));
+      } catch {}
       // Clear sensitive card inputs from memory after completion
       state.cardNumber = '';
       state.expiry = '';
       state.cvv = '';
       clearCartStorage();
-      state.step = 3;
+      window.location.href = `confirmation.html?order=${encodeURIComponent(data.order.orderNumber)}`;
+      return;
     } catch {
       state.submitError = 'Unable to connect to the server. Please try again.';
     } finally {
       state.submitting = false;
-      render();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (state.step !== 3) {
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
   }
 

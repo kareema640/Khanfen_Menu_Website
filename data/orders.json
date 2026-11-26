@@ -1,0 +1,41 @@
+[
+  {
+    "orderNumber": "KF-ORD-73359",
+    "fulfillment": "delivery",
+    "fullName": "Fatma Abdelaziz",
+    "phone": "01067602403",
+    "address": "سؤسؤس",
+    "instructions": "سبؤسؤس",
+    "pickupTime": "",
+    "pickupLocation": "",
+    "items": [
+      {
+        "id": "grilled-ham-cheese-sandwich",
+        "name": "Grilled Ham & Cheese Sandwich",
+        "size": "Regular",
+        "addons": [],
+        "unitPrice": 13,
+        "qty": 1,
+        "lineTotal": 13
+      },
+      {
+        "id": "bacon-greens-toast-sandwich",
+        "name": "Bacon & Greens Toast Sandwich",
+        "size": "Regular",
+        "addons": [],
+        "unitPrice": 15,
+        "qty": 1,
+        "lineTotal": 15
+      }
+    ],
+    "subtotal": 28,
+    "promoCode": "",
+    "discount": 0,
+    "fee": 5,
+    "total": 33,
+    "payment": {
+      "method": "cash-delivery"
+    },
+    "createdAt": "2026-11-26T22:50:44.909Z"
+  }
+]
