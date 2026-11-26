@@ -394,7 +394,7 @@ function isExpiryValid(expiry) {
   return expYm >= currentYm;
 }
 
-app.post('/api/orders', (req, res) => {
+app.post('/api/orders', async (req, res) => {
   const body = req.body || {};
   const catalog = loadCatalogMap();
 
@@ -530,7 +530,31 @@ app.post('/api/orders', (req, res) => {
   }
 
   const total = Number(Math.max(0, subtotal - discount + fee).toFixed(2));
-  const orderNumber = `KF-ORD-${Math.floor(10000 + Math.random() * 90000)}`;
+  const createdAt = new Date().toISOString();
+  const createdMs = Date.parse(createdAt);
+  const etaMinMinutes = fulfillment === 'delivery' ? 25 : 15;
+  const etaMaxMinutes = fulfillment === 'delivery' ? 35 : 20;
+  const estimatedArrivalAt = new Date(createdMs + etaMaxMinutes * 60 * 1000).toISOString();
+
+  const existingOrders = readOrders();
+  const existingNumbers = new Set(existingOrders.map(o => o.orderNumber));
+  let orderNumber;
+  do {
+    orderNumber = `KF-ORD-${Math.floor(10000 + Math.random() * 90000)}`;
+  } while (existingNumbers.has(orderNumber));
+
+  let deliveryLocation = null;
+  let mapsQuotaExceeded = false;
+  if (fulfillment === 'delivery' && address) {
+    const geo = await geocodeDeliveryAddress(address);
+    deliveryLocation = geo.location;
+    mapsQuotaExceeded = geo.quotaExceeded;
+  }
+
+  const courierPhone = fulfillment === 'delivery' && process.env.COURIER_PHONE
+    ? String(process.env.COURIER_PHONE).trim()
+    : null;
+
   const order = {
     orderNumber,
     fulfillment,
@@ -547,17 +571,213 @@ app.post('/api/orders', (req, res) => {
     fee,
     total,
     payment: paymentSummary,
-    createdAt: new Date().toISOString()
+    etaMinMinutes,
+    etaMaxMinutes,
+    estimatedArrivalAt,
+    courierPhone,
+    deliveryLocation,
+    createdAt
   };
 
   try {
-    const orders = readOrders();
-    orders.unshift(order);
-    writeOrders(orders);
-    return res.status(201).json({ order });
+    existingOrders.unshift(order);
+    writeOrders(existingOrders);
+    return res.status(201).json({
+      order: enrichOrderWithTracking(order),
+      mapsQuotaExceeded
+    });
   } catch {
     return res.status(500).json({ error: 'Could not save your order. Please try again.' });
   }
+});
+
+function getMapsApiKey() {
+  return process.env.GOOGLE_MAPS_API_KEY || process.env.VITE_GOOGLE_MAPS_API_KEY || '';
+}
+
+async function geocodeDeliveryAddress(address) {
+  const apiKey = getMapsApiKey();
+  const cleanAddress = String(address || '').trim();
+  if (!apiKey || !cleanAddress) {
+    return { location: null, quotaExceeded: false };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3500);
+  try {
+    const url = `https://geocode.googleapis.com/v4/geocode/address/${encodeURIComponent(cleanAddress)}?regionCode=eg`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'results.placeId,results.location,results.formattedAddress',
+        'X-Goog-Maps-Solution-ID': 'gmp_mcp_codeassist_v1_aistudio'
+      },
+      signal: controller.signal
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 429 || (data && data.error && data.error.status === 'RESOURCE_EXHAUSTED')) {
+      return { location: null, quotaExceeded: true };
+    }
+    if (!response.ok) {
+      return { location: null, quotaExceeded: false };
+    }
+
+    const first = Array.isArray(data.results) ? data.results[0] : null;
+    const lat = first && first.location ? Number(first.location.latitude) : NaN;
+    const lng = first && first.location ? Number(first.location.longitude) : NaN;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { location: null, quotaExceeded: false };
+    }
+
+    return {
+      location: {
+        lat,
+        lng,
+        formattedAddress: first.formattedAddress || cleanAddress,
+        placeId: first.placeId || ''
+      },
+      quotaExceeded: false
+    };
+  } catch {
+    return { location: null, quotaExceeded: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function enrichOrderWithTracking(order) {
+  if (!order) return null;
+  const createdMs = Date.parse(order.createdAt) || Date.now();
+  const elapsedSec = Math.max(0, Math.floor((Date.now() - createdMs) / 1000));
+  const isDelivery = order.fulfillment !== 'pickup';
+
+  const stageIds = ['received', 'preparing', 'on_the_way', 'delivered'];
+  let stageIndex = 0;
+  if (order.manualStatus && stageIds.includes(order.manualStatus)) {
+    stageIndex = stageIds.indexOf(order.manualStatus);
+  } else if (elapsedSec >= 180) {
+    stageIndex = 3;
+  } else if (elapsedSec >= 60) {
+    stageIndex = 2;
+  } else if (elapsedSec >= 20) {
+    stageIndex = 1;
+  }
+
+  const stageAt = offsetSec => new Date(createdMs + offsetSec * 1000).toISOString();
+  const etaMin = Number(order.etaMinMinutes) || (isDelivery ? 25 : 15);
+  const etaMax = Number(order.etaMaxMinutes) || (isDelivery ? 35 : 20);
+  const estimatedArrivalAt = order.estimatedArrivalAt || new Date(createdMs + etaMax * 60 * 1000).toISOString();
+
+  const steps = isDelivery
+    ? [
+        {
+          key: 'received',
+          label: 'Order Received',
+          description: 'Your order has been received by Kehnfan',
+          timestamp: stageAt(0)
+        },
+        {
+          key: 'preparing',
+          label: 'Being Prepared',
+          description: 'Fresh from our kitchen',
+          timestamp: stageIndex >= 1 ? stageAt(20) : null
+        },
+        {
+          key: 'on_the_way',
+          label: 'On the Way',
+          description: 'Dispatched for delivery to your address',
+          timestamp: stageIndex >= 2 ? stageAt(60) : null
+        },
+        {
+          key: 'delivered',
+          label: 'Delivered',
+          description: 'Enjoy your breakfast',
+          timestamp: stageIndex >= 3 ? stageAt(180) : null
+        }
+      ]
+    : [
+        {
+          key: 'received',
+          label: 'Order Received',
+          description: 'Your pickup order is confirmed',
+          timestamp: stageAt(0)
+        },
+        {
+          key: 'preparing',
+          label: 'Being Prepared',
+          description: 'Fresh from our kitchen',
+          timestamp: stageIndex >= 1 ? stageAt(20) : null
+        },
+        {
+          key: 'on_the_way',
+          label: 'Ready for Pickup',
+          description: 'Waiting at the Kehnfan Nasr City counter',
+          timestamp: stageIndex >= 2 ? stageAt(60) : null
+        },
+        {
+          key: 'delivered',
+          label: 'Picked Up',
+          description: 'Enjoy your breakfast',
+          timestamp: stageIndex >= 3 ? stageAt(180) : null
+        }
+      ];
+
+  const timeline = steps.map((step, idx) => ({
+    ...step,
+    completed: idx <= stageIndex,
+    current: idx === stageIndex
+  }));
+
+  return {
+    ...order,
+    etaMinMinutes: etaMin,
+    etaMaxMinutes: etaMax,
+    estimatedArrivalAt,
+    tracking: {
+      status: stageIds[stageIndex],
+      statusLabel: timeline[stageIndex].label,
+      stageIndex,
+      timeline
+    }
+  };
+}
+
+app.get('/api/orders/:orderNumber', (req, res) => {
+  const raw = String(req.params.orderNumber || '').trim().replace(/^#/, '').toUpperCase();
+  if (!raw) {
+    return res.status(400).json({ error: 'Order ID is required.' });
+  }
+  const orders = readOrders();
+  const found = orders.find(o => String(o.orderNumber || '').toUpperCase() === raw);
+  if (!found) {
+    return res.status(404).json({ error: 'Order not found.' });
+  }
+  return res.json({ order: enrichOrderWithTracking(found) });
+});
+
+app.get('/api/maps-config', (req, res) => {
+  return res.json({
+    apiKey: getMapsApiKey(),
+    branch: {
+      name: 'Kehnfan · Nasr City',
+      address: 'Nasr City, Cairo, Egypt',
+      phone: '+201067182487',
+      lat: 30.0561,
+      lng: 31.3301
+    }
+  });
+});
+
+app.get('/api/geocode', async (req, res) => {
+  const address = String(req.query.address || '').trim();
+  if (!address) {
+    return res.status(400).json({ error: 'Address is required.' });
+  }
+  const result = await geocodeDeliveryAddress(address);
+  return res.json(result);
 });
 
 app.use((req, res) => {
