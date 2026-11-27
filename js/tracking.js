@@ -168,9 +168,16 @@
     return window.__kehnfanMapsLoaderPromise;
   }
 
+  function setMapOverlayVisible(canvas, visible) {
+    const card = canvas && canvas.closest ? canvas.closest('.ord-trk-map-card') : null;
+    const overlay = card ? card.querySelector('.ord-trk-map-overlay') : null;
+    if (overlay) overlay.hidden = !visible;
+  }
+
   function renderMapFallback(order) {
     const canvas = document.getElementById('deliveryMap');
     if (!canvas) return;
+    setMapOverlayVisible(canvas, false);
     const address = order.address || 'Delivery address';
     const mapsHref = buildMapsExternalUrl(address);
     canvas.innerHTML = `<div class="ord-trk-map-fallback">
@@ -189,6 +196,7 @@
   function renderEmbedMap(order, apiKey) {
     const canvas = document.getElementById('deliveryMap');
     if (!canvas || !apiKey) return false;
+    setMapOverlayVisible(canvas, true);
     const query = order.address || 'Cairo, Egypt';
     const params = new URLSearchParams({
       key: apiKey,
@@ -301,6 +309,7 @@
         title: order.address || 'Delivery Location'
       });
       marker.append(pin);
+      setMapOverlayVisible(canvas, true);
 
       mapInitializedFor = renderKey;
     } catch {
@@ -388,7 +397,7 @@
     const rightPanel = isDelivery
       ? `<div class="ord-trk-map-card">
           <div id="deliveryMap" class="ord-trk-map" aria-label="Delivery location map"></div>
-          <div class="ord-trk-map-overlay">
+          <div class="ord-trk-map-overlay" hidden>
             <strong>Delivering to</strong>
             <span>${esc(order.address)}</span>
             <a href="${mapsExternalHref}" target="_blank" rel="noopener noreferrer">Open in Maps &nearr;</a>

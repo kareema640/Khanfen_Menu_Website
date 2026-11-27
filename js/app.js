@@ -1051,5 +1051,26 @@
     }
   });
 
+  /* Footer order tracking quick shortcut */
+  document.querySelectorAll('.news').forEach(box => {
+    const input = box.querySelector('input');
+    const btn = box.querySelector('button');
+    const goToTracking = () => {
+      const code = input ? input.value.trim().replace(/^#/, '') : '';
+      window.location.href = code
+        ? `tracking.html?order=${encodeURIComponent(code.toUpperCase())}`
+        : 'tracking.html';
+    };
+    if (btn) btn.addEventListener('click', goToTracking);
+    if (input) {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          goToTracking();
+        }
+      });
+    }
+  });
+
   renderCart();
 })();
