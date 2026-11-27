@@ -675,11 +675,11 @@
         <a class="btn btn--olive" href="index.html#menu">Explore the Menu →</a>
       </div>`;
     } else {
-      document.title = `${p.name} – Kehnfan`;
+      document.title = `${p.name} – Khanfem`;
       let qty = 1;
       const favActive = isFavorite(p.id);
       const categoryName = catLabel[p.category] || p.category;
-      const description = p.description || 'Prepared fresh to order at Kehnfan using quality ingredients.';
+      const description = p.description || 'Prepared fresh to order at Khanfem using quality ingredients.';
 
       detailRoot.innerHTML = `<div class="product-detail">
         <div class="product-detail__media${isDrink(p) ? ' product-detail__media--drink' : ''}">

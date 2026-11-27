@@ -267,9 +267,9 @@
           </div>
 
           <div class="chk-branch-card">
-            <img class="chk-branch-thumb" src="assets/images/backgrounds/our-story.jpg" alt="Kehnfan Cafe Nasr City">
+            <img class="chk-branch-thumb" src="assets/images/backgrounds/our-story.jpg" alt="Khanfem Cafe Nasr City">
             <div class="chk-branch-meta">
-              <strong>Kehnfan &middot; Nasr City</strong>
+              <strong>Khanfem &middot; Nasr City</strong>
               <span>Nasr City, Cairo &middot; Open 15 hours daily</span>
             </div>
           </div>
@@ -301,7 +301,7 @@
 
       <div class="chk-card-preview" aria-hidden="true">
         <div class="chk-card-preview__top">
-          <span class="chk-card-preview__brand">Kehnfan</span>
+          <span class="chk-card-preview__brand">Khanfem</span>
           <span class="chk-card-preview__net">${esc(brand)}</span>
         </div>
         <div class="chk-card-preview__num" id="cardPreviewNum">${formatMaskedCardPreview(digits)}</div>

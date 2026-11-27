@@ -55,9 +55,9 @@
     const locationLabel = isDelivery ? 'DELIVERING TO' : 'PICKUP LOCATION';
     const locationValue = isDelivery
       ? order.address
-      : `${order.pickupLocation || 'Kehnfan · Nasr City, Cairo'}${order.pickupTime ? ` (${order.pickupTime})` : ''}`;
+      : `${order.pickupLocation || 'Khanfem · Nasr City, Cairo'}${order.pickupTime ? ` (${order.pickupTime})` : ''}`;
 
-    document.title = `Order #${order.orderNumber} Confirmed – Kehnfan`;
+    document.title = `Order #${order.orderNumber} Confirmed – Khanfem`;
 
     root.innerHTML = `<div class="res-card ord-conf-card">
       <div class="ord-conf-hero">

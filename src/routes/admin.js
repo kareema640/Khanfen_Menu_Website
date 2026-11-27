@@ -33,7 +33,7 @@ router.get('/admin/orders',async(req,res)=>{
   res.json({orders:result.rows});
 });
 router.get('/admin/orders/:id',async(req,res)=>{
-  const result=await query(`SELECT o.*,o.id AS order_id FROM orders o WHERE o.id=$1 OR o.order_number=$1`,[req.params.id]);
+  const result=await query(`SELECT o.*,o.id AS order_id FROM orders o WHERE o.id::text=$1 OR o.order_number=$1`,[req.params.id]);
   if(!result.rowCount) throw new AppError(404,'Order not found.','NOT_FOUND'); const order=result.rows[0];
   const [items,history]=await Promise.all([query(`SELECT oi.product_name_snapshot AS name,oi.product_legacy_id AS id,oi.quantity AS qty,oi.unit_price::float8 AS "unitPrice",oi.line_total::float8 AS "lineTotal",oi.size_name AS size,COALESCE(json_agg(json_build_object('id',x.option_id,'label',x.option_label_snapshot,'price',x.unit_price_snapshot)) FILTER(WHERE x.id IS NOT NULL),'[]') AS addons FROM order_items oi LEFT JOIN order_item_options x ON x.order_item_id=oi.id WHERE oi.order_id=$1 GROUP BY oi.id`,[order.id]),query(`SELECT previous_status AS "previousStatus",new_status AS status,note,created_at AS "createdAt" FROM order_status_history WHERE order_id=$1 ORDER BY created_at`,[order.id])]);
   res.json({order:{...order,items:items.rows,history:history.rows}});
@@ -41,7 +41,7 @@ router.get('/admin/orders/:id',async(req,res)=>{
 router.patch('/admin/orders/:id/status',async(req,res)=>{
   const input=z.object({status:z.enum(['confirmed','preparing','ready_for_pickup','out_for_delivery','delivered','completed','cancelled']),note:z.string().trim().max(500).optional().default('')}).parse(req.body);
   const order=await withTransaction(async client=>{
-    const found=await client.query(`SELECT * FROM orders WHERE id=$1 OR order_number=$1 FOR UPDATE`,[req.params.id]);
+    const found=await client.query(`SELECT * FROM orders WHERE id::text=$1 OR order_number=$1 FOR UPDATE`,[req.params.id]);
     if(!found.rowCount) throw new AppError(404,'Order not found.','NOT_FOUND'); const current=found.rows[0];
     if((current.fulfillment==='pickup'&&input.status==='out_for_delivery')||(current.fulfillment==='delivery'&&input.status==='ready_for_pickup')) throw new AppError(400,'That status does not match the fulfillment type.','INVALID_TRANSITION');
     if(!transitions[current.order_status]?.includes(input.status)) throw new AppError(409,`Cannot change order from ${current.order_status} to ${input.status}.`,'INVALID_TRANSITION');
@@ -56,7 +56,7 @@ router.patch('/admin/orders/:id/status',async(req,res)=>{
 router.patch('/admin/orders/:id/payment',async(req,res)=>{
   const status=z.object({status:z.enum(['paid','failed','refunded'])}).parse(req.body).status;
   const result=await withTransaction(async client=>{
-    const order=await client.query(`SELECT id FROM orders WHERE id=$1 OR order_number=$1 FOR UPDATE`,[req.params.id]);
+    const order=await client.query(`SELECT id FROM orders WHERE id::text=$1 OR order_number=$1 FOR UPDATE`,[req.params.id]);
     if(!order.rowCount) throw new AppError(404,'Order not found.','NOT_FOUND');
     await client.query(`UPDATE orders SET payment_status=$2,updated_at=now() WHERE id=$1`,[order.rows[0].id,status]);
     await client.query(`UPDATE payments SET payment_status=$2,updated_at=now() WHERE order_id=$1`,[order.rows[0].id,status]);

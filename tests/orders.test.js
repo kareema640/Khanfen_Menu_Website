@@ -2,6 +2,7 @@
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const bcrypt = require('bcryptjs');
 
 if (!process.env.TEST_DATABASE_URL) {
   throw new Error('Set TEST_DATABASE_URL to a dedicated disposable PostgreSQL test database. Never point it at production.');
@@ -23,6 +24,11 @@ before(async () => {
   catalog = await response.json();
 });
 after(async () => {
+  await query(`DELETE FROM payments WHERE order_id IN (SELECT id FROM orders WHERE customer_email='integration@example.com' AND customer_name='Integration Test')`);
+  await query(`DELETE FROM orders WHERE customer_email='integration@example.com' AND customer_name='Integration Test'`);
+  await query(`DELETE FROM reservations WHERE customer_email='reservation@example.com' AND customer_name='Reservation Test'`);
+  await query(`DELETE FROM reviews WHERE idempotency_key LIKE 'customer-review:review-test-%'`);
+  await query(`DELETE FROM users WHERE email LIKE '%@integration.test'`);
   if (server) await new Promise(resolve => server.close(resolve));
   await closePool();
 });
@@ -136,7 +142,57 @@ test('owner-only management routes reject unauthenticated requests', async () =>
   assert.equal(response.status, 401);
 });
 
+async function createAccount(role) {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const email = `${role}-${suffix}@integration.test`;
+  const password = 'Integration-Only-Password-26!';
+  const hash = await bcrypt.hash(password, 4);
+  const inserted = await query(`INSERT INTO users(full_name,email,password_hash,role) VALUES($1,$2,$3,$4) RETURNING id`, [`Test ${role}`, email, hash, role]);
+  return { id: inserted.rows[0].id, email, password };
+}
+
+async function loginAccount(account) {
+  const response = await fetch(`${baseUrl}/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email:account.email,password:account.password}) });
+  assert.equal(response.status, 200);
+  const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];
+  assert.ok(cookie, 'login should issue a session cookie');
+  return { cookie, request: (path, options = {}) => fetch(`${baseUrl}${path}`, { ...options, headers:{...(options.headers || {}), Cookie:cookie} }) };
+}
+
+test('authenticated customer receives 403 for owner-only management APIs', async () => {
+  const customer = await createAccount('customer');
+  const session = await loginAccount(customer);
+  const response = await session.request('/admin/orders');
+  assert.equal(response.status, 403);
+});
+
+test('owner status update persists history and deduplicates status notifications', async () => {
+  const owner = await createAccount('admin');
+  const session = await loginAccount(owner);
+  const placed = await postOrder(orderBody(), uniqueKey());
+  assert.equal(placed.response.status, 201);
+  const orderNumber = placed.data.order.orderNumber;
+  const update = () => session.request(`/admin/orders/${encodeURIComponent(orderNumber)}/status`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'confirmed',note:'Integration status test'})});
+  const first = await update();
+  assert.equal(first.status, 200);
+  const repeated = await update();
+  assert.equal(repeated.status, 409, 'same transition must not be applied a second time');
+  const stored = await query(`SELECT o.order_status,(SELECT count(*)::int FROM order_status_history h WHERE h.order_id=o.id) AS history_count,(SELECT h.previous_status FROM order_status_history h WHERE h.order_id=o.id AND h.new_status='confirmed') AS previous_status,(SELECT h.new_status FROM order_status_history h WHERE h.order_id=o.id AND h.new_status='confirmed') AS new_status,(SELECT h.changed_by FROM order_status_history h WHERE h.order_id=o.id AND h.new_status='confirmed') AS changed_by,(SELECT h.note FROM order_status_history h WHERE h.order_id=o.id AND h.new_status='confirmed') AS note,(SELECT count(*)::int FROM notifications n WHERE n.order_id=o.id AND n.event_key='status:confirmed') AS notification_count FROM orders o WHERE o.order_number=$1`, [orderNumber]);
+  assert.equal(stored.rowCount, 1);
+  assert.equal(stored.rows[0].order_status, 'confirmed');
+  assert.equal(stored.rows[0].history_count, 2, 'creation and status transition each have one history event');
+  assert.equal(stored.rows[0].previous_status, 'pending');
+  assert.equal(stored.rows[0].new_status, 'confirmed');
+  assert.equal(stored.rows[0].changed_by, owner.id);
+  assert.equal(stored.rows[0].note, 'Integration status test');
+  assert.equal(stored.rows[0].notification_count, 1);
+  const detail = await session.request(`/admin/orders/${encodeURIComponent(orderNumber)}`);
+  assert.equal(detail.status, 200);
+  assert.equal((await detail.json()).order.history.length, 2);
+});
+
 test('reservation creation persists in PostgreSQL and enforces slot capacity', async () => {
+  await query(`DELETE FROM reservations WHERE customer_email='reservation@example.com' AND customer_name='Reservation Test'`);
   const date = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
   const availabilityResponse = await fetch(`${baseUrl}/reservations/availability?date=${date}`);
   assert.equal(availabilityResponse.status, 200);
@@ -156,6 +212,7 @@ test('reservation creation persists in PostgreSQL and enforces slot capacity', a
   assert.equal(stored.rowCount, 1);
   assert.equal(stored.rows[0].status, 'pending');
   assert.equal(stored.rows[0].party_size, 2);
+  await query(`DELETE FROM reservations WHERE customer_email='reservation@example.com' AND customer_name='Reservation Test'`);
 });
 
 test('reviews persist pending, remain private until approved, and then appear publicly', async () => {
