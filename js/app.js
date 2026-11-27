@@ -8,10 +8,6 @@
   const isDrink = p => p.category === 'hot-drinks' || p.category === 'cold-drinks';
   const productUrl = p => 'product.html?id=' + encodeURIComponent(p.id);
 
-  document.addEventListener('click', e => {
-    if (e.target.closest('[data-noop]')) e.preventDefault();
-  });
-
   const img = (p, cls = '') => p.image
     ? `<img class="${cls}" src="${p.image}" alt="${esc(p.name)}" loading="lazy">`
     : `<div class="ph ${cls}" role="img" aria-label="${esc(p.name)} – photo coming soon">Photo coming soon</div>`;
@@ -594,10 +590,8 @@
     const list = id => id === 'all' ? null : products.filter(p => p.category === id);
 
     function tabs(el) {
-      el.innerHTML = categories.map(c => {
-        const isActive = c.id === current || (current === 'drinks' && (c.id === 'hot-drinks' || c.id === 'cold-drinks'));
-        return `<button type="button" data-cat="${c.id}" aria-pressed="${isActive}">${c.label}</button>`;
-      }).join('');
+      el.innerHTML = categories.map(c =>
+        `<button type="button" data-cat="${c.id}" aria-pressed="${c.id === current}">${c.label}</button>`).join('');
     }
 
     function renderGrid(el, isFull) {

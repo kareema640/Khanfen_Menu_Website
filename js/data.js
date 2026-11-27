@@ -50,7 +50,7 @@ window.MENU = {
    "id": "turkey-cheese-melt-sandwich",
    "name": "Turkey & Cheese Melt Sandwich",
    "category": "sandwiches",
-   "price": 10,
+   "price": 20,
    "image": "assets/images/products/sandwiches/turkey-cheese-melt-sandwich.jpg",
    "description": "Oven-roasted sliced turkey layered with melted aged cheddar and our signature house sauce on warm toasted artisan bread."
   },
@@ -98,7 +98,7 @@ window.MENU = {
    "id": "scrambled-egg-bacon-croissant",
    "name": "Scrambled Egg & Bacon Croissant",
    "category": "sandwiches",
-   "price": 10,
+   "price": 20,
    "image": "assets/images/products/sandwiches/scrambled-egg-bacon-croissant.jpg",
    "description": "Flaky all-butter croissant filled with soft scrambled eggs, crispy bacon, and a touch of melted cheese."
   },
