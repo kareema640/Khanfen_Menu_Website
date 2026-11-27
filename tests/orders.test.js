@@ -135,3 +135,46 @@ test('owner-only management routes reject unauthenticated requests', async () =>
   const response = await fetch(`${baseUrl}/admin/orders`);
   assert.equal(response.status, 401);
 });
+
+test('reservation creation persists in PostgreSQL and enforces slot capacity', async () => {
+  const date = new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 10);
+  const availabilityResponse = await fetch(`${baseUrl}/reservations/availability?date=${date}`);
+  assert.equal(availabilityResponse.status, 200);
+  const availability = await availabilityResponse.json();
+  const time = availability.slots.find(slot => !availability.unavailableSlots.includes(slot));
+  assert.ok(time, 'test date should have at least one available reservation slot');
+  const reservationBody = { guests: '2', date, time, fullName: 'Reservation Test', phone: '01000000000', email: 'reservation@example.com', specialRequests: 'Integration test', occasion: '', preOrder: [] };
+  const post = async () => fetch(`${baseUrl}/reservations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(reservationBody) });
+  const first = await post();
+  assert.equal(first.status, 201);
+  const firstData = await first.json();
+  const second = await post();
+  assert.equal(second.status, 201);
+  const third = await post();
+  assert.equal(third.status, 409);
+  const stored = await query('SELECT status,party_size FROM reservations WHERE reservation_number=$1', [firstData.reservation.reservationNumber]);
+  assert.equal(stored.rowCount, 1);
+  assert.equal(stored.rows[0].status, 'pending');
+  assert.equal(stored.rows[0].party_size, 2);
+});
+
+test('reviews persist pending, remain private until approved, and then appear publicly', async () => {
+  const clientRequestId = `review-test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const body = { name: 'Review Test', email: 'review@example.com', rating: 5, review: 'A freshly prepared meal with excellent service.', clientRequestId };
+  const submit = () => fetch(`${baseUrl}/reviews`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const first = await submit();
+  assert.equal(first.status, 201);
+  const review = (await first.json()).review;
+  assert.equal(review.status, 'pending');
+  const duplicate = await submit();
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).review.id, review.id);
+  const hidden = await fetch(`${baseUrl}/reviews`);
+  assert.equal(hidden.status, 200);
+  assert.equal((await hidden.json()).reviews.some(item => item.id === review.id), false);
+  await query(`UPDATE reviews SET moderation_status='approved' WHERE id=$1`, [review.id]);
+  const shown = await fetch(`${baseUrl}/reviews`);
+  const publicData = await shown.json();
+  assert.equal(publicData.reviews.some(item => item.id === review.id), true);
+  assert.ok(publicData.stats.count >= 1);
+});
