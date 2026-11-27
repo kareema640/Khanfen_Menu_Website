@@ -24,8 +24,10 @@ router.get('/admin/overview',async(_req,res)=>{
 });
 router.get('/admin/reports',async(req,res)=>{
   const from=String(req.query.from||'').slice(0,10); const to=String(req.query.to||'').slice(0,10);
-  const daily=await query(`SELECT created_at::date AS day,count(*)::int AS orders,COALESCE(sum(total_amount) FILTER(WHERE payment_status='paid' AND order_status<>'cancelled'),0)::float8 AS revenue FROM orders WHERE is_demo=FALSE AND ($1='' OR created_at::date >= $1::date) AND ($2='' OR created_at::date <= $2::date) GROUP BY created_at::date ORDER BY day`,[from,to]);
-  res.json({daily:daily.rows});
+  if((from&&!/^\d{4}-\d{2}-\d{2}$/.test(from))||(to&&!/^\d{4}-\d{2}-\d{2}$/.test(to))) throw new AppError(400,'Dates must use YYYY-MM-DD.','INVALID_DATE_RANGE');
+  const daily=await query(`SELECT day,placed_orders AS orders,paid_orders AS "paidOrders",paid_revenue::float8 AS revenue,pending_cash_value::float8 AS "pendingCashValue" FROM reporting_daily_sales WHERE ($1='' OR day >= $1::date) AND ($2='' OR day <= $2::date) ORDER BY day`,[from,to]);
+  const summarize=(step,label)=>{const grouped=new Map();for(const row of daily.rows){const day=row.day instanceof Date?row.day.toISOString().slice(0,10):String(row.day).slice(0,10);const date=new Date(`${day}T00:00:00Z`);let key;if(step==='day')key=day;else if(step==='week'){const weekday=(date.getUTCDay()+6)%7;date.setUTCDate(date.getUTCDate()-weekday);key=date.toISOString().slice(0,10);}else key=`${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}`;const item=grouped.get(key)||{[label]:key,orders:0,paidOrders:0,revenue:0,pendingCashValue:0};item.orders+=row.orders;item.paidOrders+=row.paidOrders;item.revenue+=row.revenue;item.pendingCashValue+=row.pendingCashValue;grouped.set(key,item);}return [...grouped.values()];};
+  res.json({revenueDefinition:'Paid, non-demo orders excluding cancellations; pending cash value is reported separately.',daily:daily.rows,weekly:summarize('week','weekStarting'),monthly:summarize('month','month')});
 });
 router.get('/admin/orders',async(req,res)=>{
   const status=String(req.query.status||''); const type=String(req.query.fulfillment||''); const search=String(req.query.q||'').trim().slice(0,120); const from=String(req.query.from||'').slice(0,10);const to=String(req.query.to||'').slice(0,10);

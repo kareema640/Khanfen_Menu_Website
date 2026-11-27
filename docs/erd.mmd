@@ -1,0 +1,144 @@
+erDiagram
+  USERS o|--o{ ORDERS : places
+  USERS o|--o{ RESERVATIONS : books
+  USERS o|--o{ REVIEWS : writes
+  USERS o|--o{ NOTIFICATIONS : receives
+  USERS o|--o{ ORDER_STATUS_HISTORY : changes
+  CATEGORIES ||--o{ PRODUCTS : classifies
+  CATEGORIES o|--o{ CATEGORIES : parent_of
+  PRODUCTS o|--o{ ORDER_ITEMS : referenced_by
+  PRODUCTS o|--o{ RESERVATION_ITEMS : referenced_by
+  ORDERS ||--o{ ORDER_ITEMS : contains
+  ORDER_ITEMS ||--o{ ORDER_ITEM_OPTIONS : has_options
+  ORDERS ||--o{ PAYMENTS : records
+  ORDERS ||--o{ ORDER_STATUS_HISTORY : tracks
+  ORDERS o|--o{ NOTIFICATIONS : emits
+  RESERVATIONS ||--o{ RESERVATION_ITEMS : includes
+
+  USERS {
+    uuid id PK
+    text full_name
+    text email UK
+    text role
+    text password_hash
+  }
+  CATEGORIES {
+    uuid id PK
+    text slug UK
+    uuid parent_id FK
+    boolean is_active
+  }
+  PRODUCTS {
+    uuid id PK
+    text legacy_id UK
+    text slug UK
+    uuid category_id FK
+    numeric price
+    boolean is_available
+  }
+  ADDONS {
+    text id PK
+    text label
+    numeric price
+    text group_key
+  }
+  PROMOTIONS {
+    text code PK
+    text discount_type
+    numeric discount_value
+    boolean is_active
+  }
+  RESTAURANT_SETTINGS {
+    smallint id PK
+    text timezone
+    numeric delivery_fee
+    integer reservation_capacity
+  }
+  RESTAURANT_HOURS {
+    smallint weekday PK
+    time opens_at
+    time closes_at
+    boolean is_closed
+  }
+  ORDERS {
+    uuid id PK
+    text order_number UK
+    text tracking_token_hash UK
+    uuid user_id FK
+    text order_status
+    text payment_status
+    numeric total_amount
+    boolean is_demo
+  }
+  ORDER_ITEMS {
+    uuid id PK
+    uuid order_id FK
+    uuid product_id FK
+    text product_name_snapshot
+    text product_category_snapshot
+    numeric unit_price
+    integer quantity
+  }
+  ORDER_ITEM_OPTIONS {
+    uuid id PK
+    uuid order_item_id FK
+    text option_label_snapshot
+    numeric unit_price_snapshot
+  }
+  PAYMENTS {
+    uuid id PK
+    uuid order_id FK
+    text payment_method
+    text payment_status
+    text provider_reference
+  }
+  ORDER_STATUS_HISTORY {
+    uuid id PK
+    uuid order_id FK
+    uuid changed_by FK
+    text new_status
+  }
+  RESERVATIONS {
+    uuid id PK
+    text reservation_number UK
+    uuid user_id FK
+    date reservation_date
+    time reservation_time
+    text status
+    boolean is_demo
+  }
+  RESERVATION_ITEMS {
+    uuid id PK
+    uuid reservation_id FK
+    uuid product_id FK
+    text product_name_snapshot
+    numeric unit_price
+  }
+  REVIEWS {
+    uuid id PK
+    uuid user_id FK
+    smallint rating
+    text moderation_status
+    boolean is_demo
+  }
+  NOTIFICATIONS {
+    uuid id PK
+    uuid user_id FK
+    uuid order_id FK
+    text event_key
+  }
+  IDEMPOTENCY_KEYS {
+    uuid id PK
+    text idempotency_key UK
+    uuid resource_id
+    jsonb response_payload
+  }
+  SESSIONS {
+    text sid PK
+    json sess
+    timestamp expire
+  }
+  SCHEMA_MIGRATIONS {
+    text version PK
+    timestamp applied_at
+  }

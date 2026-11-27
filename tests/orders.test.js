@@ -78,6 +78,14 @@ test('valid checkout persists database-priced order/item snapshots and retrieves
   assert.equal(invalidToken.status, 404);
 });
 
+test('seeded KHANFEM10 promotion is validated and calculated by the server', async () => {
+  const { response, data } = await postOrder(orderBody({ promoCode:'KHANFEM10' }), uniqueKey());
+  assert.equal(response.status, 201);
+  assert.equal(data.order.promoCode, 'KHANFEM10');
+  assert.equal(data.order.discount, Math.round(data.order.subtotal * 0.1 * 100) / 100);
+  assert.equal(data.order.total, data.order.subtotal - data.order.discount + data.order.fee);
+});
+
 test('idempotent retry returns the same order and capability token', async () => {
   const body = orderBody({ fulfillment: 'pickup', address: '', pickupTime: 'ASAP · 15 min', paymentMethod: 'cash-pickup' });
   const key = uniqueKey();
@@ -186,9 +194,21 @@ test('owner status update persists history and deduplicates status notifications
   assert.equal(stored.rows[0].changed_by, owner.id);
   assert.equal(stored.rows[0].note, 'Integration status test');
   assert.equal(stored.rows[0].notification_count, 1);
+  const payment = await session.request(`/admin/orders/${encodeURIComponent(orderNumber)}/payment`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'paid'})});
+  assert.equal(payment.status, 200);
+  const paidReport = await query(`SELECT d.paid_orders,d.paid_revenue FROM reporting_daily_sales d WHERE d.day=(SELECT created_at::date FROM orders WHERE order_number=$1)`, [orderNumber]);
+  assert.equal(Number(paidReport.rows[0].paid_orders) >= 1, true);
+  assert.equal(Number(paidReport.rows[0].paid_revenue) >= Number(placed.data.order.total), true);
   const detail = await session.request(`/admin/orders/${encodeURIComponent(orderNumber)}`);
   assert.equal(detail.status, 200);
   assert.equal((await detail.json()).order.history.length, 2);
+  const reports = await session.request('/admin/reports');
+  assert.equal(reports.status, 200);
+  const reportData = await reports.json();
+  assert.match(reportData.revenueDefinition, /paid, non-demo/i);
+  assert.ok(Array.isArray(reportData.daily) && Array.isArray(reportData.weekly) && Array.isArray(reportData.monthly));
+  const invalidRange = await session.request('/admin/reports?from=not-a-date');
+  assert.equal(invalidRange.status, 400);
 });
 
 test('reservation creation persists in PostgreSQL and enforces slot capacity', async () => {

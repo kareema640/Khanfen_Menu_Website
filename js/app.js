@@ -101,8 +101,8 @@
   function evaluatePromo(code, subtotal, fulfillment) {
     const clean = String(code || '').trim().toUpperCase();
     if (!clean) return { valid: false, code: '', discount: 0, waivedFee: false, message: 'Enter a promo code.' };
-    if (clean === 'KEHNFAN10') {
-      return { valid: true, code: clean, discount: Number((subtotal * 0.1).toFixed(2)), waivedFee: false, message: 'KEHNFAN10 applied · 10% off' };
+    if (clean === 'KHANFEM10') {
+      return { valid: true, code: clean, discount: Number((subtotal * 0.1).toFixed(2)), waivedFee: false, message: 'KHANFEM10 applied · 10% off' };
     }
     if (clean === 'MORNING15') {
       return { valid: true, code: clean, discount: Number((subtotal * 0.15).toFixed(2)), waivedFee: false, message: 'MORNING15 applied · 15% off' };
@@ -122,7 +122,7 @@
       }
       return { valid: true, code: clean, discount: 5, waivedFee: false, message: 'SAVE5 applied · $5 off' };
     }
-    return { valid: false, code: '', discount: 0, waivedFee: false, message: 'Invalid code. Try KEHNFAN10, MORNING15, or FREEDEL.' };
+    return { valid: false, code: '', discount: 0, waivedFee: false, message: 'Invalid code. Try KHANFEM10, MORNING15, or FREEDEL.' };
   }
 
   function calcTotals(cart, prefsOverride) {
@@ -327,7 +327,7 @@
 
     summaryEl.innerHTML = `<form class="cart-promo" id="cartPromoForm" novalidate>
         <div class="cart-promo__row">
-          <input id="cartPromoInput" type="text" value="${esc(totals.promoCode)}" placeholder="Promo code (e.g. KEHNFAN10)" aria-label="Promo code">
+          <input id="cartPromoInput" type="text" value="${esc(totals.promoCode)}" placeholder="Promo code (e.g. KHANFEM10)" aria-label="Promo code">
           <button class="cart-promo__apply" type="submit">Apply</button>
         </div>
         ${promoFeedback ? `<div class="cart-promo__msg${promoErrorClass}">
