@@ -29,80 +29,6 @@
     }
   });
 
-  function readSavedOrder(orderNumber) {
-    try {
-      const clean = String(orderNumber || '').trim().replace(/^#/, '').toUpperCase();
-      if (clean) {
-        const map = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
-        if (map && typeof map === 'object') {
-          const matchKey = Object.keys(map).find(k => k.toUpperCase() === clean);
-          if (matchKey && map[matchKey]) return map[matchKey];
-        }
-      }
-      const last = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || 'null');
-      if (last && (!clean || String(last.orderNumber || '').toUpperCase() === clean)) {
-        return last;
-      }
-    } catch {}
-    return null;
-  }
-
-  function saveOrderToStorage(order) {
-    if (!order || !order.orderNumber) return;
-    try {
-      localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(order));
-      const storedMap = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
-      const map = storedMap && typeof storedMap === 'object' && !Array.isArray(storedMap) ? storedMap : {};
-      map[order.orderNumber] = order;
-      localStorage.setItem(ORDERS_MAP_KEY, JSON.stringify(map));
-    } catch {}
-  }
-
-  function computeLocalTracking(order) {
-    if (order && order.tracking && Array.isArray(order.tracking.timeline)) {
-      return order.tracking;
-    }
-    const createdMs = Date.parse(order.createdAt) || Date.now();
-    const elapsedSec = Math.max(0, Math.floor((Date.now() - createdMs) / 1000));
-    const isDelivery = order.fulfillment !== 'pickup';
-
-    let stageIndex = 0;
-    if (elapsedSec >= 180) stageIndex = 3;
-    else if (elapsedSec >= 60) stageIndex = 2;
-    else if (elapsedSec >= 20) stageIndex = 1;
-
-    const stageAt = offsetSec => new Date(createdMs + offsetSec * 1000).toISOString();
-    const defs = isDelivery
-      ? [
-          { key: 'received', label: 'Order Received', description: 'Your order has been received by Kehnfan', offset: 0 },
-          { key: 'preparing', label: 'Being Prepared', description: 'Fresh from our kitchen', offset: 20 },
-          { key: 'on_the_way', label: 'On the Way', description: 'Dispatched for delivery to your address', offset: 60 },
-          { key: 'delivered', label: 'Delivered', description: 'Enjoy your breakfast', offset: 180 }
-        ]
-      : [
-          { key: 'received', label: 'Order Received', description: 'Your pickup order is confirmed', offset: 0 },
-          { key: 'preparing', label: 'Being Prepared', description: 'Fresh from our kitchen', offset: 20 },
-          { key: 'on_the_way', label: 'Ready for Pickup', description: 'Waiting at the Kehnfan Nasr City counter', offset: 60 },
-          { key: 'delivered', label: 'Picked Up', description: 'Enjoy your breakfast', offset: 180 }
-        ];
-
-    const timeline = defs.map((d, idx) => ({
-      key: d.key,
-      label: d.label,
-      description: d.description,
-      timestamp: idx <= stageIndex ? stageAt(d.offset) : null,
-      completed: idx <= stageIndex,
-      current: idx === stageIndex
-    }));
-
-    return {
-      status: defs[stageIndex].key,
-      statusLabel: defs[stageIndex].label,
-      stageIndex,
-      timeline
-    };
-  }
-
   function formatClock(iso) {
     if (!iso) return '';
     const d = new Date(iso);
@@ -263,7 +189,6 @@
           if (geoData.location && typeof geoData.location.lat === 'number' && typeof geoData.location.lng === 'number') {
             loc = geoData.location;
             order.deliveryLocation = loc;
-            saveOrderToStorage(order);
           }
         }
       } catch {}
@@ -371,7 +296,7 @@
   function renderTracking(order) {
     const prevOrderNumber = currentOrder ? currentOrder.orderNumber : '';
     currentOrder = order;
-    const tracking = computeLocalTracking(order);
+    const tracking = order.tracking || { status: order.orderStatus, statusLabel: order.orderStatus, stageIndex: 0, timeline: [] };
     const isDelivery = order.fulfillment !== 'pickup';
     const etaTime = getEtaTimeText(order);
     const headerMeta = isDelivery
@@ -474,21 +399,18 @@
 
   async function refreshOrder(orderNumber) {
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}`);
+      const token = new URLSearchParams(window.location.search).get('token') || '';
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`);
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         if (data && data.order) {
-          saveOrderToStorage(data.order);
           renderTracking(data.order);
           return data.order;
         }
       }
     } catch {}
-    if (currentOrder) {
-      currentOrder.tracking = computeLocalTracking({ ...currentOrder, tracking: null });
-      renderTracking(currentOrder);
-    }
-    return currentOrder;
+    renderMissingOrder('Unable to load the live order status. Please try again.');
+    return null;
   }
 
   function startPolling(orderNumber) {
@@ -505,24 +427,20 @@
   async function init() {
     const params = new URLSearchParams(window.location.search);
     const paramOrder = (params.get('order') || '').trim().replace(/^#/, '');
-    const saved = readSavedOrder(paramOrder);
 
-    if (saved) {
-      renderTracking(saved);
-    }
 
-    const targetNumber = paramOrder || (saved && saved.orderNumber) || '';
-    if (!targetNumber) {
-      renderMissingOrder('');
+    const token = params.get('token') || '';
+    const targetNumber = paramOrder;
+    if (!targetNumber || !token) {
+      renderMissingOrder('A secure tracking link is required.');
       return;
     }
 
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(targetNumber)}`);
+      const res = await fetch(`/api/orders/${encodeURIComponent(targetNumber)}?token=${encodeURIComponent(token)}`);
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
         if (data && data.order) {
-          saveOrderToStorage(data.order);
           renderTracking(data.order);
           if (!data.order.tracking || data.order.tracking.stageIndex < 3) {
             startPolling(data.order.orderNumber);
@@ -530,17 +448,9 @@
           return;
         }
       }
-      if (saved) {
-        startPolling(saved.orderNumber);
-      } else {
-        renderMissingOrder(`We could not find order #${targetNumber}.`);
-      }
+      renderMissingOrder('Order not found or tracking link expired.');
     } catch {
-      if (saved) {
-        startPolling(saved.orderNumber);
-      } else {
-        renderMissingOrder('Unable to load order tracking right now.');
-      }
+      renderMissingOrder('Unable to load order tracking right now.');
     }
   }
 
@@ -557,7 +467,8 @@
       const input = document.getElementById('trkLookupInput');
       const code = input ? input.value.trim().replace(/^#/, '') : '';
       if (!code) return;
-      window.location.href = `tracking.html?order=${encodeURIComponent(code.toUpperCase())}`;
+      const token = new URLSearchParams(window.location.search).get('token') || '';
+      window.location.href = `tracking.html?order=${encodeURIComponent(code.toUpperCase())}&token=${encodeURIComponent(token)}`;
     }
   });
 

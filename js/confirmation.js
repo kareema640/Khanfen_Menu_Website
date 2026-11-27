@@ -4,45 +4,6 @@
 
   const CART = window.KEHNFAN_CART;
   const { currency } = window.MENU;
-  const LAST_ORDER_KEY = 'kehnfan_last_order_v1';
-  const ORDERS_MAP_KEY = 'kehnfan_orders_v1';
-
-  const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  const fmtMoney = n => {
-    if (CART) return CART.fmtMoney(n);
-    const val = Number(n || 0);
-    return Number.isInteger(val) ? currency + val : currency + Number(val.toFixed(2));
-  };
-
-  function readSavedOrder(orderNumber) {
-    try {
-      const clean = String(orderNumber || '').trim().replace(/^#/, '').toUpperCase();
-      if (clean) {
-        const map = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
-        if (map && typeof map === 'object') {
-          const matchKey = Object.keys(map).find(k => k.toUpperCase() === clean);
-          if (matchKey && map[matchKey]) return map[matchKey];
-        }
-      }
-      const last = JSON.parse(localStorage.getItem(LAST_ORDER_KEY) || 'null');
-      if (last && (!clean || String(last.orderNumber || '').toUpperCase() === clean)) {
-        return last;
-      }
-    } catch {}
-    return null;
-  }
-
-  function saveOrderToStorage(order) {
-    if (!order || !order.orderNumber) return;
-    try {
-      localStorage.setItem(LAST_ORDER_KEY, JSON.stringify(order));
-      const storedMap = JSON.parse(localStorage.getItem(ORDERS_MAP_KEY) || '{}');
-      const map = storedMap && typeof storedMap === 'object' && !Array.isArray(storedMap) ? storedMap : {};
-      map[order.orderNumber] = order;
-      localStorage.setItem(ORDERS_MAP_KEY, JSON.stringify(map));
-    } catch {}
-  }
-
   function formatPaymentLabel(payment) {
     if (!payment) return 'Cash on Delivery';
     if (payment.method === 'cash-delivery') return 'Cash on Delivery';
@@ -163,7 +124,7 @@
       </div>
 
       <div class="ord-conf-actions">
-        <a class="btn btn--olive ord-conf-track-btn" href="tracking.html?order=${encodeURIComponent(order.orderNumber)}">Track Order &rarr;</a>
+        <a class="btn btn--olive ord-conf-track-btn" href="tracking.html?order=${encodeURIComponent(order.orderNumber)}&token=${encodeURIComponent(new URLSearchParams(window.location.search).get('token') || '')}">Track Order &rarr;</a>
         <a class="btn res-btn-outline ord-conf-secondary-btn" href="order.html">Order More</a>
       </div>
     </div>`;
@@ -171,39 +132,16 @@
 
   async function init() {
     const params = new URLSearchParams(window.location.search);
-    const paramOrder = (params.get('order') || '').trim().replace(/^#/, '');
-    let saved = readSavedOrder(paramOrder);
-
-    if (saved) {
-      renderOrder(saved);
-    }
-
-    const targetNumber = paramOrder || (saved && saved.orderNumber) || '';
-    if (!targetNumber) {
-      renderMissingOrder('');
-      return;
-    }
-
+    const orderNumber = (params.get('order') || '').trim().replace(/^#/, '');
+    const token = params.get('token') || '';
+    if (!orderNumber || !token) { renderMissingOrder('A secure order tracking link is required.'); return; }
     try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(targetNumber)}`);
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data && data.order) {
-          saveOrderToStorage(data.order);
-          renderOrder(data.order);
-          return;
-        }
-      }
-      if (!saved) {
-        renderMissingOrder(`We could not find order #${targetNumber}.`);
-      }
-    } catch {
-      if (!saved) {
-        renderMissingOrder('Unable to load order details right now.');
-      }
-    }
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(token)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.order) { renderMissingOrder(data.error || 'We could not find that order.'); return; }
+      renderOrder(data.order);
+    } catch { renderMissingOrder('Unable to load order details right now.'); }
   }
-
   root.addEventListener('submit', async e => {
     if (e.target && e.target.id === 'confLookupForm') {
       e.preventDefault();

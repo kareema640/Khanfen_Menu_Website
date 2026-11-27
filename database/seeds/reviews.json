@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Kareema Esmaiel",
+    "rating": 5,
+    "review": "The breakfast sandwiches are absolutely amazing! Fresh, delicious, and honestly the perfect way to start my day.",
+    "createdAt": "2026-11-10T09:00:00.000Z",
+    "demo": true
+  },
+  {
+    "name": "Noha Sherief",
+    "rating": 5,
+    "review": "Such a cozy place! The coffee is great, the desserts are irresistible, and everything tastes freshly made",
+    "createdAt": "2026-11-12T10:30:00.000Z",
+    "demo": true
+  },
+  {
+    "name": "Mariam Samy",
+    "rating": 5,
+    "review": "My new favorite breakfast spot! Loved the food, the atmosphere, and every little detail. Can't wait to come back!",
+    "createdAt": "2026-11-15T11:15:00.000Z",
+    "demo": true
+  }
+]

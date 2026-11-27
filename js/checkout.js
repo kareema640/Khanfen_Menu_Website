@@ -9,43 +9,11 @@
   const DELIVERY_FEE = 5;
   const PICKUP_FEE = 0;
   const PICKUP_TIMES = ['ASAP · 15 min', '9:15', '9:30', '9:45'];
-  const WALLETS = ['Apple Pay', 'Google Pay', 'Meeza Digital'];
 
   const PAYMENT_METHODS = [
-    {
-      id: 'cash-delivery',
-      title: 'Cash on Delivery',
-      description: 'Pay the courier when your order arrives.',
-      icon: '💵',
-      fulfillment: 'delivery',
-      group: 'cash'
-    },
-    {
-      id: 'cash-pickup',
-      title: 'Cash on Pickup',
-      description: 'Pay at the counter when you collect.',
-      icon: '🏪',
-      fulfillment: 'pickup',
-      group: 'cash'
-    },
-    {
-      id: 'card',
-      title: 'Credit / Debit Card',
-      description: 'Visa, Mastercard, Meeza.',
-      icon: '💳',
-      fulfillment: 'both',
-      group: 'card'
-    },
-    {
-      id: 'online',
-      title: 'Online Payment',
-      description: 'Apple Pay, Google Pay, and supported digital wallets.',
-      icon: '📱',
-      fulfillment: 'both',
-      group: 'online'
-    }
+    { id: 'cash-delivery', title: 'Cash on Delivery', description: 'Pay the courier when your order arrives.', icon: '💵', fulfillment: 'delivery', group: 'cash' },
+    { id: 'cash-pickup', title: 'Cash on Pickup', description: 'Pay at the counter when you collect.', icon: '🏪', fulfillment: 'pickup', group: 'cash' }
   ];
-
   const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const fmtMoney = n => CART ? CART.fmtMoney(n) : (currency + n);
 
@@ -105,11 +73,6 @@
     instructions: '',
     pickupTime: 'ASAP · 15 min',
     paymentMethod: initialPrefs.fulfillment === 'pickup' ? 'cash-pickup' : 'cash-delivery',
-    wallet: 'Apple Pay',
-    cardholderName: '',
-    cardNumber: '',
-    expiry: '',
-    cvv: '',
     step1Errors: {},
     step2Errors: {},
     submitError: '',
@@ -404,9 +367,6 @@
     if (!items.length) return renderEmptyCart();
     ensureCompatiblePaymentMethod();
 
-    if (state.paymentMethod === 'card') {
-      return renderCardDetailsForm(items);
-    }
 
     const { total } = getTotals(items);
     const methods = getCompatibleMethods();
@@ -428,18 +388,6 @@
           </button>`;
         }).join('')}
       </div>
-
-      ${state.paymentMethod === 'online' ? `
-        <div class="chk-wallet-box">
-          <p class="res-label">Select digital wallet</p>
-          <div class="chk-wallet-pills" role="group" aria-label="Digital wallet options">
-            ${WALLETS.map(w => {
-              const selected = state.wallet === w;
-              return `<button type="button" class="chk-wallet-pill${selected ? ' is-selected' : ''}" data-wallet="${esc(w)}" aria-pressed="${selected}">${esc(w)}</button>`;
-            }).join('')}
-          </div>
-        </div>
-      ` : ''}
 
       ${renderOrderSummary(items)}
 
@@ -587,12 +535,6 @@
       return;
     }
 
-    if (state.paymentMethod === 'card' && !validateCardForm()) {
-      render();
-      const firstErr = root.querySelector('.is-invalid input');
-      if (firstErr) firstErr.focus();
-      return;
-    }
 
     state.submitting = true;
     state.submitError = '';
@@ -613,100 +555,29 @@
       instructions: state.fulfillment === 'delivery' ? state.instructions : '',
       pickupTime: state.fulfillment === 'pickup' ? state.pickupTime : '',
       paymentMethod: state.paymentMethod,
-      wallet: state.paymentMethod === 'online' ? state.wallet : undefined,
-      card: state.paymentMethod === 'card'
-        ? {
-            cardholderName: state.cardholderName,
-            cardNumber: state.cardNumber,
-            expiry: state.expiry,
-            cvv: state.cvv
-          }
-        : undefined
     };
-
-    function buildLocalOrder() {
-      const totals = getTotals(items);
-      const createdAt = new Date().toISOString();
-      const createdMs = Date.parse(createdAt);
-      const isDelivery = state.fulfillment !== 'pickup';
-      const etaMinMinutes = isDelivery ? 25 : 15;
-      const etaMaxMinutes = isDelivery ? 35 : 20;
-      const estimatedArrivalAt = new Date(createdMs + etaMaxMinutes * 60 * 1000).toISOString();
-      const orderNumber = `KF-ORD-${Math.floor(10000 + Math.random() * 90000)}`;
-
-      let paymentSummary = { method: state.paymentMethod };
-      if (state.paymentMethod === 'card') {
-        const digits = state.cardNumber.replace(/\D/g, '');
-        paymentSummary = {
-          method: 'card',
-          brand: detectCardBrand(digits),
-          last4: digits.slice(-4),
-          cardholderName: state.cardholderName
-        };
-      } else if (state.paymentMethod === 'online') {
-        paymentSummary = { method: 'online', wallet: state.wallet || 'Digital Wallet' };
-      }
-
-      return {
-        orderNumber,
-        fulfillment: state.fulfillment,
-        fullName: state.fullName,
-        phone: state.phone,
-        address: isDelivery ? state.address : '',
-        instructions: isDelivery ? state.instructions : '',
-        pickupTime: !isDelivery ? state.pickupTime : '',
-        pickupLocation: !isDelivery ? 'Kehnfan · Nasr City, Cairo' : '',
-        items: items.map(i => ({
-          id: i.id,
-          name: i.name,
-          size: i.size || 'Regular',
-          addons: i.addons || [],
-          unitPrice: i.unitPrice,
-          qty: i.qty,
-          lineTotal: i.lineTotal
-        })),
-        subtotal: totals.subtotal,
-        promoCode: totals.promoCode || '',
-        discount: totals.discount || 0,
-        fee: totals.fee,
-        total: totals.total,
-        payment: paymentSummary,
-        etaMinMinutes,
-        etaMaxMinutes,
-        estimatedArrivalAt,
-        courierPhone: null,
-        deliveryLocation: null,
-        createdAt
-      };
-    }
 
     function completeWithOrder(order) {
       state.confirmedOrder = order;
-      try {
-        localStorage.setItem('kehnfan_last_order_v1', JSON.stringify(order));
-        const storedMap = JSON.parse(localStorage.getItem('kehnfan_orders_v1') || '{}');
-        const map = storedMap && typeof storedMap === 'object' && !Array.isArray(storedMap) ? storedMap : {};
-        map[order.orderNumber] = order;
-        localStorage.setItem('kehnfan_orders_v1', JSON.stringify(map));
-      } catch {}
-      // Clear sensitive card inputs from memory after completion
+      const token = order.trackingToken;
+      if (!token) {
+        state.submitError = 'The server did not return secure order tracking details. Please contact the restaurant before retrying.';
+        state.confirmedOrder = null;
+        return;
+      }
       state.cardNumber = '';
       state.expiry = '';
       state.cvv = '';
       clearCartStorage();
-      window.location.href = `confirmation.html?order=${encodeURIComponent(order.orderNumber)}`;
+      window.location.href = `confirmation.html?order=${encodeURIComponent(order.orderNumber)}&token=${encodeURIComponent(token)}`;
     }
 
     try {
       const res = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': (window.crypto && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`) },
         body: JSON.stringify(payload)
       });
-      if (res.status === 404 || res.status === 405 || res.status === 501) {
-        completeWithOrder(buildLocalOrder());
-        return;
-      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.order) {
         state.submitError = data.error || 'Could not place your order. Please try again.';
@@ -715,7 +586,7 @@
       completeWithOrder(data.order);
       return;
     } catch {
-      completeWithOrder(buildLocalOrder());
+      state.submitError = 'We could not reach the order service. Your order was not placed; please try again.';
       return;
     } finally {
       state.submitting = false;
@@ -738,8 +609,7 @@
     if (stepBtn && !stepBtn.disabled) {
       const target = Number(stepBtn.dataset.chkStep);
       if (target < state.step) {
-        if (state.paymentMethod === 'card') syncCardInputs();
-        state.step = target;
+          state.step = target;
         state.submitError = '';
         render();
       }
@@ -780,7 +650,6 @@
 
     const switchBtn = e.target.closest('[data-pay-switch]');
     if (switchBtn) {
-      syncCardInputs();
       state.paymentMethod = switchBtn.dataset.paySwitch;
       state.step2Errors = {};
       state.submitError = '';
@@ -790,13 +659,9 @@
 
     const walletBtn = e.target.closest('[data-wallet]');
     if (walletBtn) {
-      state.wallet = walletBtn.dataset.wallet;
-      render();
-      return;
     }
 
     if (e.target.closest('#chkBackToPayOptions')) {
-      syncCardInputs();
       state.paymentMethod = state.fulfillment === 'delivery' ? 'cash-delivery' : 'cash-pickup';
       state.submitError = '';
       render();
@@ -805,7 +670,6 @@
     }
 
     if (e.target.closest('#chkBackToDetails')) {
-      if (state.paymentMethod === 'card') syncCardInputs();
       state.submitError = '';
       state.step = 1;
       render();
