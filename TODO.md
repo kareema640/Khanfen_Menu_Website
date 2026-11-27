@@ -24,7 +24,7 @@
 
 ## Reservations, reviews and notifications
 - [ ] Reservation form collects customer name, phone, email, guests, date/time and special requests; validates inputs, creates a database reservation/reference and returns confirmation. Persist owner-visible reservation data. Owner can confirm, reject, cancel or complete reservations. Availability conflicts are prevented transactionally; operating hours, slot duration and capacity are configurable. Keep seeded defaults editable and document their assumptions.
-- [ ] Reviews are validated and persisted. Store sample reviews as database seeds, not permanent frontend content. Use moderation status; only approved reviews are public and contribute to average rating/count. Owner can review/approve/reject pending submissions when moderation is enabled.
+- [x] Reviews are validated and persisted. Store sample reviews as database seeds, not permanent frontend content. Use moderation status; only approved reviews are public and contribute to average rating/count. Owner can review/approve/reject pending submissions when moderation is enabled.
 - [ ] Generate durable, deduplicated in-app notifications for actual order placement and persisted status transitions. Link to customer/order, allow authenticated customers to view and mark read/unread; provide safe guest order notifications via tracking capability if guests have no account. Do not claim email/SMS/push without a configured and tested provider.
 
 ## Authentication, owner dashboard and analytics

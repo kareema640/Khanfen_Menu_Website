@@ -174,6 +174,31 @@ test('authenticated customer receives 403 for owner-only management APIs', async
   assert.equal(response.status, 403);
 });
 
+test('customers can read and unread only their own notifications; guests use the tracking capability', async () => {
+  const customer = await createAccount('customer');
+  const session = await loginAccount(customer);
+  const placed = await session.request('/orders', {method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':uniqueKey()},body:JSON.stringify(orderBody())});
+  assert.equal(placed.status, 201);
+  const order = await placed.json();
+  const list = await session.request('/notifications');
+  assert.equal(list.status, 200);
+  const notification = (await list.json()).notifications.find(item => item.type === 'order_placed');
+  assert.ok(notification);
+  const guest = await fetch(`${baseUrl}/orders/${order.order.orderNumber}/notifications?token=${encodeURIComponent(order.trackingToken)}`);
+  assert.equal(guest.status, 200);
+  assert.ok((await guest.json()).notifications.some(item => item.id === notification.id));
+  const mark = (isRead) => session.request(`/notifications/${notification.id}/read`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({isRead})});
+  const read = await mark(true);
+  assert.ok((await read.json()).notification.readAt);
+  const unread = await mark(false);
+  assert.equal((await unread.json()).notification.readAt, null);
+  const other = await loginAccount(await createAccount('customer'));
+  const forbidden = await other.request(`/notifications/${notification.id}/read`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({isRead:false})});
+  assert.equal(forbidden.status, 404);
+  const invalidToken = await fetch(`${baseUrl}/orders/${order.order.orderNumber}/notifications?token=invalid`);
+  assert.equal(invalidToken.status, 404);
+});
+
 test('owner status update persists history and deduplicates status notifications', async () => {
   const owner = await createAccount('admin');
   const session = await loginAccount(owner);
@@ -194,6 +219,9 @@ test('owner status update persists history and deduplicates status notifications
   assert.equal(stored.rows[0].changed_by, owner.id);
   assert.equal(stored.rows[0].note, 'Integration status test');
   assert.equal(stored.rows[0].notification_count, 1);
+  const guestNotifications = await fetch(`${baseUrl}/orders/${orderNumber}/notifications?token=${encodeURIComponent(placed.data.trackingToken)}`);
+  assert.equal(guestNotifications.status, 200);
+  assert.ok((await guestNotifications.json()).notifications.some(item => item.type === 'order_status' && item.title === 'Order confirmed'));
   const payment = await session.request(`/admin/orders/${encodeURIComponent(orderNumber)}/payment`, {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'paid'})});
   assert.equal(payment.status, 200);
   const paidReport = await query(`SELECT d.paid_orders,d.paid_revenue FROM reporting_daily_sales d WHERE d.day=(SELECT created_at::date FROM orders WHERE order_number=$1)`, [orderNumber]);
@@ -249,9 +277,19 @@ test('reviews persist pending, remain private until approved, and then appear pu
   const hidden = await fetch(`${baseUrl}/reviews`);
   assert.equal(hidden.status, 200);
   assert.equal((await hidden.json()).reviews.some(item => item.id === review.id), false);
-  await query(`UPDATE reviews SET moderation_status='approved' WHERE id=$1`, [review.id]);
+  const owner = await loginAccount(await createAccount('admin'));
+  const moderation = await owner.request(`/admin/reviews/${review.id}/moderation`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'approved'})});
+  assert.equal(moderation.status, 200);
   const shown = await fetch(`${baseUrl}/reviews`);
   const publicData = await shown.json();
   assert.equal(publicData.reviews.some(item => item.id === review.id), true);
   assert.ok(publicData.stats.count >= 1);
+  const rejectedBody = {...body,clientRequestId:`review-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,review:'A separate pending review for moderation.'};
+  const rejectedResponse = await fetch(`${baseUrl}/reviews`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rejectedBody)});
+  assert.equal(rejectedResponse.status,201);
+  const rejectedReview = (await rejectedResponse.json()).review;
+  const reject = await owner.request(`/admin/reviews/${rejectedReview.id}/moderation`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'rejected'})});
+  assert.equal(reject.status,200);
+  const publicAfterReject = await fetch(`${baseUrl}/reviews`);
+  assert.equal((await publicAfterReject.json()).reviews.some(item => item.id === rejectedReview.id),false);
 });

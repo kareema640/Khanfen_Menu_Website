@@ -155,7 +155,8 @@ router.get('/notifications', requireUser, async (req,res) => {
   res.json({notifications:result.rows});
 });
 router.patch('/notifications/:id/read', requireUser, async (req,res) => {
-  const result=await query(`UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING id,read_at AS "readAt"`,[req.params.id,req.session.user.id]);
+  const isRead=z.object({isRead:z.boolean().optional().default(true)}).parse(req.body||{}).isRead;
+  const result=await query(`UPDATE notifications SET read_at=CASE WHEN $3 THEN COALESCE(read_at,now()) ELSE NULL END WHERE id=$1 AND user_id=$2 RETURNING id,read_at AS "readAt"`,[req.params.id,req.session.user.id,isRead]);
   if (!result.rowCount) throw new AppError(404,'Notification not found.','NOT_FOUND');
   res.json({notification:result.rows[0]});
 });

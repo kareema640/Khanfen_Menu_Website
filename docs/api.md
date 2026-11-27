@@ -26,7 +26,7 @@ Login and signup are rate-limited. Production must set a 32+ character `SESSION_
 | `GET /orders/:orderNumber?token=...` | Capability-token lookup for customer confirmation/tracking. The unguessable token is returned at order creation; only its hash is stored. Customer email and phone are omitted from this response. |
 | `GET /orders/:orderNumber/notifications?token=...` | Read notifications for the capability-protected guest order. |
 | `GET /notifications` | Read notifications for the signed-in user. |
-| `PATCH /notifications/:id/read` | Mark an owned notification read; does not expose other users' notification IDs/data. |
+| `PATCH /notifications/:id/read` | Mark an owned notification read (default) or send `{ "isRead": false }` to mark it unread; does not expose other users' notification IDs/data. |
 
 Repeated identical idempotency keys return the original result; a key reused for different request details returns `409`. Card and wallet checkout is deliberately rejected until a real provider and webhook verification exist. The current checkout is cash-only; no external payment, email, or SMS service is claimed as active.
 
